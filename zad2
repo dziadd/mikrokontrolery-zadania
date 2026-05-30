@@ -1,265 +1,103 @@
+// PIC24FJ128GA010 Configuration Bit Settings
+// CONFIG2
+#pragma config POSCMOD = XT 
+#pragma config OSCIOFNC = ON 
+#pragma config FCKSM = CSDCMD 
+#pragma config FNOSC = PRI 
+#pragma config IESO = ON 
+// CONFIG1
+#pragma config WDTPS = PS32768 
+#pragma config FWPSA = PR128 
+#pragma config WINDIS = ON 
+#pragma config FWDTEN = OFF 
+#pragma config ICS = PGx2 
+#pragma config GWRP = OFF 
+#pragma config GCP = OFF 
+#pragma config JTAGEN = OFF 
+
+// Definicja taktowania (wymagana dla __delay32)
+#define FCY 4000000UL 
+
 #include <xc.h>
-
 #include <libpic30.h>
-
 #include <stdbool.h>
-
 #include <stdint.h>
-
-#include <stdio.h>
-
 #include "buttons.h"
-
-#include "lcd.h"
-
 #include "adc.h"
 
-
-
-// Typ wyliczeniowy przechowujący stany naszego alarmu
-
-// Ułatwia to czytelność kodu w stosunku do używania zwykłych liczb
-
+// Stany alarmu (usunięto stan WYLACZONY, bo wracamy prosto do NORMALNY)
 typedef enum {
-
     STAN_NORMALNY,
-
     STAN_MRUGANIE,
-
-    STAN_CIAGLY,
-
-    STAN_WYLACZONY_PRZYCISKIEM
-
+    STAN_CIAGLY
 } StanAlarmu;
 
-
-
 int main(void) {
-
     // ------------------------------------------------
-
     // KONFIGURACJA SPRZĘTU
-
     // ------------------------------------------------
-
-    AD1PCFG = 0xFFFF; // Ustawienie pinów analogowych jako cyfrowe I/O (dla LED)
-
+    AD1PCFG = 0xFFFF; // Ustawienie pinów jako cyfrowe I/O (dla LED)
     TRISA = 0x0000;   // PORTA (diody LED) jako wyjścia
-
     LATA = 0x0000;    // Zgaszenie wszystkich diod na start
-
     
-
-    // Inicjalizacja potencjometru (ADC)
-
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
-
     ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
-
     
-
-    // Inicjalizacja LCD
-
-    LCD_Initialize();
-
-    LCD_ClearScreen();
-
-    
-
-    // ------------------------------------------------
-
-    // ZMIENNE PROGRAMU
-
-    // ------------------------------------------------
-
     StanAlarmu obecnyStan = STAN_NORMALNY;
-
-    StanAlarmu poprzedniStan = STAN_NORMALNY; // Do odświeżania LCD
-
-    
-
     unsigned int wartoscPotencjometru = 0;
-
-    unsigned int poprzedniaWartosc = 0xFFFF;
-
+    int licznikCzasu = 0; 
     
-
-    int licznikCzasu = 0; // Licznik obiegów pętli do odmierzania 5 sekund
-
-    char tekstLcd[16];    // Bufor na tekst dla wyświetlacza
-
-    
-
     // ------------------------------------------------
-
     // GŁÓWNA PĘTLA PROGRAMU
-
     // ------------------------------------------------
-
     while (1) {
-
-        // 1. ODCZYT DANYCH Z CZUJNIKA
-
         wartoscPotencjometru = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
-
         if (wartoscPotencjometru == 0xFFFF) {
-
-            continue; // Pominięcie w przypadku błędu odczytu
-
+            continue; 
         }
-
         
-
-        // 2. ODCZYT PRZYCISKU (WYCISZENIE ALARMU)
-
-        // Jeśli alarm trwa, a użytkownik wciśnie S3, alarm zostaje wyciszony
-
-        if (BUTTON_IsPressed(BUTTON_S3) == true) {
-
-            if (obecnyStan == STAN_MRUGANIE || obecnyStan == STAN_CIAGLY) {
-
-                obecnyStan = STAN_WYLACZONY_PRZYCISKIEM;
-
-            }
-
-        }
-
+        // --- LOGIKA ALARMU ---
         
-
-        // 3. LOGIKA ALARMU (Maszyna stanów)
-
-        // Połowa zakresu 10-bitowego przetwornika ADC (0-1023) to 512.
-
-        if (wartoscPotencjometru < 512) {
-
-            // Zejście poniżej nastawy resetuje system
-
-            obecnyStan = STAN_NORMALNY;
-
-            licznikCzasu = 0;
-
-            LATA = 0x0000; // Gasimy diody
-
-        } else {
-
-            // Wartość powyżej nastawy (>= 512)!
-
-            
-
-            // Przejście ze stanu normalnego do mrugania (start alarmu)
-
-            if (obecnyStan == STAN_NORMALNY) {
-
+        // 1. Jeśli jest normalnie i przekroczymy 50% (512) -> odpalamy alarm
+        if (obecnyStan == STAN_NORMALNY) {
+            if (wartoscPotencjometru >= 512) {
                 obecnyStan = STAN_MRUGANIE;
-
                 licznikCzasu = 0;
-
             }
-
+        } 
+        // 2. Jeśli alarm trwa (mruga lub świeci ciągle)
+        else if (obecnyStan == STAN_MRUGANIE || obecnyStan == STAN_CIAGLY) {
             
-
-            // Obsługa pierwszej fazy: Mruganie 1 diody przez 5 sekund
-
+            // PRÓBA WYŁĄCZENIA: Działa TYLKO, gdy suwak < 50% ORAZ wciśnięto S3
+            if (wartoscPotencjometru < 512 && BUTTON_IsPressed(BUTTON_S3) == true) {
+                obecnyStan = STAN_NORMALNY;
+                LATA = 0x0000; // Zgaś diody
+            }
+            
+            // Jeśli alarmu nie wyłączono, realizujemy jego świecenie:
             if (obecnyStan == STAN_MRUGANIE) {
-
-                // Pętla wykonuje się co 100ms. Zmiana stanu diody co 5 obiegów = 500ms
-
+                // Mruganie (co 5 obiegów pętli)
                 if ((licznikCzasu / 5) % 2 == 0) {
-
-                    LATA = 0x0001; // Zapal pierwszą diodę
-
+                    LATA = 0x0001; 
                 } else {
-
-                    LATA = 0x0000; // Zgaś
-
+                    LATA = 0x0000; 
                 }
-
                 
-
                 licznikCzasu++;
-
                 
-
-                // 5 sekund to 50 obiegów po 100ms
-
+                // Po 50 obiegach (5 sekundach) przechodzimy w tryb ciągły
                 if (licznikCzasu >= 50) {
-
-                    obecnyStan = STAN_CIAGLY; // Przejście do fazy drugiej
-
+                    obecnyStan = STAN_CIAGLY;
                 }
-
             } 
-
-            // Obsługa drugiej fazy: Zapalone wszystkie diody po upływie 5s
-
             else if (obecnyStan == STAN_CIAGLY) {
-
-                LATA = 0x00FF; // Wszystkie 8 diod (szesnastkowo 0xFF, binarnie 0b11111111)
-
-            } 
-
-            // Obsługa fazy trzeciej: Alarm zignorowany przez użytkownika
-
-            else if (obecnyStan == STAN_WYLACZONY_PRZYCISKIEM) {
-
-                LATA = 0x0000; // Diody zgaszone pomimo przekroczonego progu
-
+                LATA = 0x00FF; // Zapal wszystkie 8 diod
             }
-
         }
-
         
-
-        // 4. OBSŁUGA WYŚWIETLACZA LCD
-
-        // Odświeżamy tylko przy zmianach (przesunięcie bitowe >> 2 redukuje drobny szum z ADC)
-
-        if ((wartoscPotencjometru >> 2) != (poprzedniaWartosc >> 2) || obecnyStan != poprzedniStan) {
-
-            poprzedniaWartosc = wartoscPotencjometru;
-
-            poprzedniStan = obecnyStan;
-
-            
-
-            LCD_ClearScreen();
-
-            
-
-            // Przygotowanie odpowiedniego komunikatu w zależności od stanu
-
-            if (obecnyStan == STAN_NORMALNY) {
-
-                sprintf(tekstLcd, "%4u - OK", wartoscPotencjometru);
-
-            } else if (obecnyStan == STAN_MRUGANIE || obecnyStan == STAN_CIAGLY) {
-
-                sprintf(tekstLcd, "%4u - ALARM", wartoscPotencjometru);
-
-            } else if (obecnyStan == STAN_WYLACZONY_PRZYCISKIEM) {
-
-                sprintf(tekstLcd, "%4u - OFF", wartoscPotencjometru);
-
-            }
-
-            
-
-            LCD_PutString(tekstLcd, 15);
-
-        }
-
-        
-
-        // Baza czasu dla systemu (ok. 100 milisekund)
-
-        // Pozwala na zliczanie czasu alarmu bez blokowania wejść
-
-        __delay32(100000); 
-
+        // Baza czasu: 400 000 cykli = 100 milisekund (przy zegarze 4 MHz)
+        __delay32(400000); 
     }
-
     
-
     return 0;
-
 }
