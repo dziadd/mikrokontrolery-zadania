@@ -6,7 +6,7 @@
 #include "lcd.h" 
 
 // =========================================================
-// ZADANIE 1 - PODPROGRAMY LICZNIKÓW
+// ZADANIE 1 - PODPROGRAMY LICZNIKÓW button s3 cofasz a button s6 dajesz na kolejny program
 // =========================================================
 
 // Podprogram 1: 8-bitowy licznik binarny w górę (0...255)
