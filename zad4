@@ -55,7 +55,7 @@ int main(void) {
         // 1. Odczyt mocy mikrofali (0-100%)
         unsigned int adcVal = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
         if(adcVal != 0xFFFF) {
-            mocProcent = (adcVal * 100) / 1023; 
+            mocProcent = (adcVal * 100L) / 1023; // Dodane 'L' rozwiązuje problem!
         }
 
         // 2. Odczyt przycisków z wykrywaniem zbocza (Edge Detection)
