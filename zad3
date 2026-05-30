@@ -18,7 +18,7 @@ int main(void) {
     LCD_ClearScreen();
     
     // Tekst do animacji przesuwanej (długi string z odpowiednimi spacjami na początku i końcu)
-    char scrollMsg[] = "        Nie wychodz po zmroku... Ucieczka jest niemozliwa... Obejrzyj STAMTAD!        ";
+    char scrollMsg[] = "        Nie wychodz po zmroku... Ucieczka jest niemozliwa... Obejrzyj STAMTAD NA NETFLIX!!!        ";
     // Obliczenie długości komunikatu
     int msgLen = strlen(scrollMsg);
     
@@ -32,18 +32,18 @@ int main(void) {
             LCD_ClearScreen();
             LCD_PutString("  OSTRZEZENIE!  ", 16);
             LATA = 0xFFFF;       // Zapal wszystkie diody (błysk)
-            __delay32(3000000);  // Krótkie opóźnienie
+            __delay32(2000000);  // Krótkie opóźnienie
             
             LCD_ClearScreen();
             LATA = 0x0000;       // Zgaś diody
-            __delay32(2000000);  // Krótkie opóźnienie
+            __delay32(1000000);  // Krótkie opóźnienie
         }
         
         // --- FAZA 2: Budowanie napięcia ---
         LCD_ClearScreen();
         LCD_PutString(" Zostan w domu. ", 16);
         LATA = 0x0081; // Zapalenie skrajnych diod dla klimatu
-        __delay32(15000000); // Dłuższa pauza (ok. 1.5 sekundy)
+        __delay32(10000000); // Dłuższa pauza (ok. 1.5 sekundy)
         
         // --- FAZA 3: Przesuwany tekst (Marquee) ---
         // Wyświetlacz ma 16 znaków szerokości. Przesuwamy "okienko" po długim tekście.
@@ -65,7 +65,7 @@ int main(void) {
                 LATA = 0x0055; // Wzór 01010101
             }
             
-            __delay32(2000000); // Szybkość przesuwania tekstu
+            __delay32(1000000); // Szybkość przesuwania tekstu
         }
         
         LATA = 0x0000;
