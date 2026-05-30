@@ -172,8 +172,8 @@ int main(void) {
             LCD_PutString(buforLcd, 32);
         }
 
-        // Czas trwania pętli (~100 milisekund)
-        __delay32(100000); 
+       // Czas trwania pętli (~100 milisekund przy zegarze 4 MIPS)
+        __delay32(400000);
     }
     
     return 0;
