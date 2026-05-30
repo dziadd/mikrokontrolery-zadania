@@ -55,7 +55,8 @@ int main(void) {
         // 1. Odczyt mocy mikrofali (0-100%)
         unsigned int adcVal = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
         if(adcVal != 0xFFFF) {
-            mocProcent = (adcVal * 100L) / 1023; // Dodane 'L' rozwiązuje problem!
+            // POPRAWKA 1: '100L' wymusza obliczenia 32-bitowe i zapobiega błędom Integer Overflow
+            mocProcent = (adcVal * 100L) / 1023; 
         }
 
         // 2. Odczyt przycisków z wykrywaniem zbocza (Edge Detection)
@@ -172,8 +173,8 @@ int main(void) {
             LCD_PutString(buforLcd, 32);
         }
 
-       // Czas trwania pętli (~100 milisekund przy zegarze 4 MIPS)
-        __delay32(400000);
+        // POPRAWKA 2: Dokładnie 400 000 cykli = 100 milisekund opóźnienia przy taktowaniu 4 MIPS.
+        __delay32(400000); 
     }
     
     return 0;
