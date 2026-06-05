@@ -84,7 +84,7 @@ int main(void) {
                 }
             } 
             else if (obecnyStan == STAN_CIAGLY) {
-                LATA = 0x00FF; // Zapal wszystkie 8 diod
+                LATA = 0x00FF; //wszystkie diody sie swieca
             }
         }
         
