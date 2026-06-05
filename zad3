@@ -2,74 +2,62 @@
 #include <libpic30.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h> // Wymagane dla funkcji kopiującej fragmenty tekstu (strncpy)
+#include <string.h> 
 #include "buttons.h"
 #include "lcd.h"
 
 int main(void) {
-    // ------------------------------------------------
-    // KONFIGURACJA SPRZĘTU
-    // ------------------------------------------------
-    AD1PCFG = 0xFFFF; // Ustawienie pinów jako cyfrowe
-    TRISA = 0x0000;   // PORTA (diody LED) jako wyjścia
-    LATA = 0x0000;    // Zgaszenie wszystkich diod na start
+    AD1PCFG = 0xFFFF; 
+    TRISA = 0x0000;   
+    LATA = 0x0000;    
     
     LCD_Initialize();
     LCD_ClearScreen();
     
-    // Tekst do animacji przesuwanej (długi string z odpowiednimi spacjami na początku i końcu)
+    //tekst do animacji
     char scrollMsg[] = "        Nie wychodz po zmroku... Ucieczka jest niemozliwa... Obejrzyj STAMTAD NA NETFLIX!!!        ";
-    // Obliczenie długości komunikatu
+    //obliczanie dlugosci komunikatu
     int msgLen = strlen(scrollMsg);
     
-    // ------------------------------------------------
-    // GŁÓWNA PĘTLA ANIMACJI (REKLAMA)
-    // ------------------------------------------------
     while (1) {
         
-        // --- FAZA 1: Miganie OSTRZEŻENIA (Efekt stroboskopowy) ---
         for (int i = 0; i < 4; i++) {
             LCD_ClearScreen();
             LCD_PutString("  OSTRZEZENIE!  ", 16);
-            LATA = 0xFFFF;       // Zapal wszystkie diody (błysk)
-            __delay32(2000000);  // Krótkie opóźnienie
+            LATA = 0xFFFF;       
+            __delay32(2000000); 
             
             LCD_ClearScreen();
-            LATA = 0x0000;       // Zgaś diody
-            __delay32(1000000);  // Krótkie opóźnienie
+            LATA = 0x0000;
+            __delay32(1000000); 
         }
         
-        // --- FAZA 2: Budowanie napięcia ---
         LCD_ClearScreen();
         LCD_PutString(" Zostan w domu. ", 16);
-        LATA = 0x0081; // Zapalenie skrajnych diod dla klimatu
-        __delay32(10000000); // Dłuższa pauza (ok. 1.5 sekundy)
+        LATA = 0x0081; 
+        __delay32(10000000);
         
-        // --- FAZA 3: Przesuwany tekst (Marquee) ---
-        // Wyświetlacz ma 16 znaków szerokości. Przesuwamy "okienko" po długim tekście.
         for (int i = 0; i <= msgLen - 16; i++) {
             LCD_ClearScreen();
             
-            // Kopiujemy dokładnie 16 znaków od aktualnej pozycji (i)
             char buffer[17];
             strncpy(buffer, &scrollMsg[i], 16);
-            buffer[16] = '\0'; // Zakończenie stringa (wymagane w C)
+            buffer[16] = '\0'; 
             
-            // Wyświetlenie wyciętego okienka 16 znaków
             LCD_PutString(buffer, 16);
             
-            // Migoczące diody podczas przesuwania tekstu
+            //migoczące diody
             if (i % 2 == 0) {
-                LATA = 0x00AA; // Wzór 10101010
+                LATA = 0x00AA; 
             } else {
-                LATA = 0x0055; // Wzór 01010101
+                LATA = 0x0055; 
             }
             
-            __delay32(1000000); // Szybkość przesuwania tekstu
+            __delay32(1000000); 
         }
         
         LATA = 0x0000;
-        __delay32(10000000); // Pauza przed powtórzeniem całej reklamy
+        __delay32(10000000); //pauza przed powtorka reklamy
     }
     
     return 0;
