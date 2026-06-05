@@ -7,7 +7,7 @@
 #include "lcd.h"
 #include "adc.h"
 
-// Stany pracy mikrofali
+//stany pracy mikrofali
 typedef enum {
     STAN_GOTOWA,
     STAN_GRZANIE,
@@ -16,11 +16,8 @@ typedef enum {
 } StanMikrofali;
 
 int main(void) {
-    // ------------------------------------------------
-    // KONFIGURACJA SPRZĘTU
-    // ------------------------------------------------
     AD1PCFG = 0xFFFF; 
-    TRISA = 0x0080;   // RA7 jako wejście (S5), reszta (LED) jako wyjścia
+    TRISA = 0x0080;
     LATA = 0x0000;
     
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
@@ -29,79 +26,68 @@ int main(void) {
     LCD_Initialize();
     LCD_ClearScreen();
 
-    // ------------------------------------------------
-    // ZMIENNE GŁÓWNE
-    // ------------------------------------------------
     StanMikrofali stan = STAN_GOTOWA;
-    int czasSekundy = 0;       // Czas grzania
-    int mocProcent = 0;        // Moc w %
-    int odliczanieBazy = 0;    // Licznik pętli do uciekania sekund
+    int czasSekundy = 0;       //czas grzania
+    int mocProcent = 0;        //moc w %
+    int odliczanieBazy = 0;    //licznik pętli do uciekania sekund
     
-    // Zmienne do "Edge Detection" (wykrywania wciśnięcia przycisku)
+    //zmienne do wykrywania wcisniecia przycisku
     bool s3Poprzednio = false;
     bool s4Poprzednio = false;
     bool s6Poprzednio = false;
     
-    // Zmienne do inteligentnego odświeżania LCD
+    //zmienne do odswiezania lcd
     StanMikrofali staryStan = STAN_KONIEC; 
     int staryCzas = -1;
     int staraMoc = -1;
-    char buforLcd[33]; // 16 znaków 1 linia + 16 znaków 2 linia + \0
+    char buforLcd[33]; 
     
-    // ------------------------------------------------
-    // GŁÓWNA PĘTLA 
-    // ------------------------------------------------
     while(1) {
-        // 1. Odczyt mocy mikrofali (0-100%)
+        //Odczyt mocy mikrofali (0-100%)
         unsigned int adcVal = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
         if(adcVal != 0xFFFF) {
-            // POPRAWKA 1: '100L' wymusza obliczenia 32-bitowe i zapobiega błędom Integer Overflow
+            //poprawka: '100L' zapobiega bledom integeroverflow
             mocProcent = (adcVal * 100L) / 1023; 
         }
 
-        // 2. Odczyt przycisków z wykrywaniem zbocza (Edge Detection)
-        // Działa tylko w momencie przejścia z "puszczony" na "wciśnięty"
         bool s3Teraz = BUTTON_IsPressed(BUTTON_S3);
         bool s4Teraz = BUTTON_IsPressed(BUTTON_S4);
         bool s6Teraz = BUTTON_IsPressed(BUTTON_S6);
         
-        bool wcisnietoDodajCzas = s3Teraz && !s3Poprzednio; // +10 sekund
-        bool wcisnietoStartStop = s4Teraz && !s4Poprzednio; // Start / Pauza
-        bool wcisnietoReset     = s6Teraz && !s6Poprzednio; // Anuluj / Kasuj
+        bool wcisnietoDodajCzas = s3Teraz && !s3Poprzednio; //+10 sekund
+        bool wcisnietoStartStop = s4Teraz && !s4Poprzednio; //start/pauza
+        bool wcisnietoReset     = s6Teraz && !s6Poprzednio; //anuluj/reset
         
-        // Zapisujemy aktualny stan na poczet kolejnego obiegu pętli
         s3Poprzednio = s3Teraz;
         s4Poprzednio = s4Teraz;
         s6Poprzednio = s6Teraz;
 
-        // 3. LOGIKA MASZYNY STANÓW
-        // - - - - - - - - - - - - - - - 
-        // Przycisk S3: DODAJ CZAS (+10 sekund)
+
+        //przycisk S3 +10s:
         if (wcisnietoDodajCzas) {
             czasSekundy += 10;
-            if (czasSekundy > 3599) czasSekundy = 3599; // Max 59:59
+            if (czasSekundy > 3599) czasSekundy = 3599; 
             
-            // Jeśli byliśmy w ekranie podsumowania, to dodanie czasu nas wraca do gotowości
             if (stan == STAN_KONIEC) {
                 stan = STAN_GOTOWA;
                 LATA = 0x0000;
             }
         }
         
-        // Przycisk S6: RESET (Wyzerowanie, kasowanie powiadomienia)
+        //przycisk S6 reset:
         if (wcisnietoReset) {
             czasSekundy = 0;
             stan = STAN_GOTOWA;
             LATA = 0x0000;
         }
 
-        // Przycisk S4: START / STOP
+        //przycisk S4 start/stop
         if (wcisnietoStartStop) {
             if (stan == STAN_GOTOWA && czasSekundy > 0) {
                 stan = STAN_GRZANIE;
             } else if (stan == STAN_GRZANIE) {
                 stan = STAN_PAUZA;
-                LATA = 0x0000; // Światło wewnątrz gaśnie w pauzie
+                LATA = 0x0000;
             } else if (stan == STAN_PAUZA && czasSekundy > 0) {
                 stan = STAN_GRZANIE;
             } else if (stan == STAN_KONIEC) {
@@ -109,17 +95,15 @@ int main(void) {
             }
         }
 
-        // 4. OBSŁUGA UPŁYWU CZASU
-        // - - - - - - - - - - - - - - - 
-        // Główna pętla trwa ~100ms. Po 10 obiegach mija 1 sekunda.
+        //upływ czasu
         if (stan == STAN_GRZANIE) {
             odliczanieBazy++;
             
-            // Efekt "kręcącego się talerza" z 4 diod LED (animacja)
+            //animacja diod
             int fazaAnimacji = (odliczanieBazy / 2) % 4; 
             LATA = (1 << fazaAnimacji); 
             
-            // Co 10 obiegów odlicz 1 sekundę
+            //co 10 obiegów odlicz 1 sekundę
             if (odliczanieBazy >= 10) {
                 odliczanieBazy = 0;
                 czasSekundy--;
@@ -127,23 +111,21 @@ int main(void) {
                 if (czasSekundy <= 0) {
                     czasSekundy = 0;
                     stan = STAN_KONIEC;
-                    LATA = 0x0000; // Zgaś diody
+                    LATA = 0x0000;
                 }
             }
         } 
         else if (stan == STAN_KONIEC) {
-            // Sygnał dźwiękowy/wizualny gotowego dania - mruganie wszystkimi diodami
+            //gotowe - mruganie diodami
             odliczanieBazy++;
             if ((odliczanieBazy / 5) % 2 == 0) LATA = 0x00FF;
             else LATA = 0x0000;
         } 
         else {
-            odliczanieBazy = 0; // Reset bazy w pauzie lub gotowości
+            odliczanieBazy = 0;
         }
 
-        // 5. OBSŁUGA WYŚWIETLACZA LCD
-        // - - - - - - - - - - - - - - - 
-        // Maskowanie delikatnych skoków napięcia potencjometru przez '/2'
+        //wyswietlacz lcd
         if (stan != staryStan || czasSekundy != staryCzas || (mocProcent/2) != (staraMoc/2)) {
             staryStan = stan;
             staryCzas = czasSekundy;
@@ -163,17 +145,14 @@ int main(void) {
             char linia1[17];
             char linia2[17];
             
-            // Formatowanie dokładne do 16 znaków na każdą linię (zabezpieczenie nowej linii)
             sprintf(linia1, "MOC:%3d%%   %02d:%02d", mocProcent, minuty, sekundy); 
-            sprintf(linia2, "STAN: %-10s", nazwaStanu); // %-10s wypełnia spacjami z prawej do 10 znaków
+            sprintf(linia2, "STAN: %-10s", nazwaStanu);
             
-            // Złączenie w jeden string 32-znakowy. Ekran zrzuci drugie 16 znaków do drugiego wiersza
             sprintf(buforLcd, "%-16s%-16s", linia1, linia2);
             
             LCD_PutString(buforLcd, 32);
         }
 
-        // POPRAWKA 2: Dokładnie 400 000 cykli = 100 milisekund opóźnienia przy taktowaniu 4 MIPS.
         __delay32(400000); 
     }
     
