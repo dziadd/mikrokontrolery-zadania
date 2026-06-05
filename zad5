@@ -6,7 +6,7 @@
 #include "buttons.h"
 #include "lcd.h"
 
-// Stany zegara szachowego
+//stany zegara szachowego
 typedef enum {
     STAN_OCZEKIWANIE,
     STAN_GRACZ1_MYSLI,
@@ -16,42 +16,30 @@ typedef enum {
 } StanZegara;
 
 int main(void) {
-    // ------------------------------------------------
-    // KONFIGURACJA SPRZĘTU
-    // ------------------------------------------------
-    AD1PCFG = 0xFFFF; // Piny cyfrowe
-    TRISA = 0x0080;   // Konfiguracja portów (unikamy konfliktu z S5)
+    AD1PCFG = 0xFFFF; 
+    TRISA = 0x0080;   
     LATA = 0x0000;
 
     LCD_Initialize();
     LCD_ClearScreen();
 
-    // ------------------------------------------------
-    // ZMIENNE GŁÓWNE
-    // ------------------------------------------------
     StanZegara stan = STAN_OCZEKIWANIE;
     StanZegara staryStan = STAN_OCZEKIWANIE; 
 
-    // Czas bazowy przechowujemy w DZIESIĄTYCH częściach sekundy (rozdzielczość 100ms)
-    // 5 minut = 300 sekund = 3000 decysekund.
     long czasG1 = 3000;
     long czasG2 = 3000;
 
     long staryCzasG1 = -1;
     long staryCzasG2 = -1;
 
-    // Do detekcji zbocza
     bool s3Poprzednio = false;
     bool s6Poprzednio = false;
     bool s4Poprzednio = false;
 
     char buforLcd[33];
 
-    // ------------------------------------------------
-    // GŁÓWNA PĘTLA 
-    // ------------------------------------------------
     while(1) {
-        // 1. Odczyt przycisków graczy
+        //odczyt przyciskow graczy
         bool s3Teraz = BUTTON_IsPressed(BUTTON_S3); // Gracz 1
         bool s6Teraz = BUTTON_IsPressed(BUTTON_S6); // Gracz 2
         bool s4Teraz = BUTTON_IsPressed(BUTTON_S4); // Reset
@@ -64,7 +52,7 @@ int main(void) {
         s6Poprzednio = s6Teraz;
         s4Poprzednio = s4Teraz;
 
-        // 2. LOGIKA MASZYNY STANÓW ZEGARA
+        //logika stanow zegara
         if (wcisnietoReset) {
             stan = STAN_OCZEKIWANIE;
             czasG1 = 3000;
@@ -73,15 +61,15 @@ int main(void) {
         }
 
         if (stan == STAN_OCZEKIWANIE) {
-            // Pierwsze wciśnięcie dowolnego przycisku startuje zegar przeciwnika
+            //pierwsze wcisniecie startuje zegar przeciwnika
             if (wcisnietoG1) stan = STAN_GRACZ2_MYSLI;
             else if (wcisnietoG2) stan = STAN_GRACZ1_MYSLI;
         } 
         else if (stan == STAN_GRACZ1_MYSLI) {
             if (wcisnietoG1) {
-                stan = STAN_GRACZ2_MYSLI; // Gracz 1 kończy ruch
+                stan = STAN_GRACZ2_MYSLI; 
             } else {
-                czasG1--; // Zegar gracza 1 tyka (co 100ms)
+                czasG1--; 
                 if (czasG1 <= 0) {
                     czasG1 = 0;
                     stan = STAN_KONIEC_G1_PRZEGRAL;
@@ -91,7 +79,7 @@ int main(void) {
         } 
         else if (stan == STAN_GRACZ2_MYSLI) {
             if (wcisnietoG2) {
-                stan = STAN_GRACZ1_MYSLI; // Gracz 2 kończy ruch
+                stan = STAN_GRACZ1_MYSLI; 
             } else {
                 czasG2--; // Zegar gracza 2 tyka (co 100ms)
                 if (czasG2 <= 0) {
@@ -102,8 +90,7 @@ int main(void) {
             }
         }
 
-        // 3. OBSŁUGA WYŚWIETLACZA LCD
-        // Odświeżamy tylko jeśli zmienił się stan lub pełna sekunda (dzielenie przez 10)
+        //wyswietlacz lcd
         if (stan != staryStan || (czasG1/10) != (staryCzasG1/10) || (czasG2/10) != (staryCzasG2/10)) {
             staryStan = stan;
             staryCzasG1 = czasG1;
@@ -118,7 +105,7 @@ int main(void) {
                 LCD_PutString(buforLcd, 32);
             } 
             else {
-                // Przeliczanie dziesiątych części sekundy na format MM:SS
+                //przeliczanie dziesiatych czesci sekundy na format MM:SS
                 int sekundyG1 = czasG1 / 10;
                 int minG1 = sekundyG1 / 60;
                 int secG1 = sekundyG1 % 60;
@@ -127,7 +114,7 @@ int main(void) {
                 int minG2 = sekundyG2 / 60;
                 int secG2 = sekundyG2 % 60;
 
-                // Animacja wskazująca na czyj ruch (strzałka 7 znaków)
+                //strzalka ktora pokazuje na gracza ktory mysli
                 char* aktywnyG1 = (stan == STAN_GRACZ1_MYSLI) ? "< MYSLI" : "       ";
                 char* aktywnyG2 = (stan == STAN_GRACZ2_MYSLI) ? "< MYSLI" : "       ";
                 if (stan == STAN_OCZEKIWANIE) {
@@ -138,7 +125,6 @@ int main(void) {
                 char linia1[17];
                 char linia2[17];
                 
-                // Formatowanie z użyciem %7s do wyrównania napisu do prawej krawędzi
                 sprintf(linia1, "G1: %02d:%02d%7s", minG1, secG1, aktywnyG1);
                 sprintf(linia2, "G2: %02d:%02d%7s", minG2, secG2, aktywnyG2);
 
@@ -149,7 +135,6 @@ int main(void) {
             }
         }
 
-        // Dokładnie 100 milisekund (Baza czasu dla logiki zegara)
         __delay32(400000); 
     }
     return 0;
