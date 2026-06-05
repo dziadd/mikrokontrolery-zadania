@@ -5,13 +5,9 @@
 #include "buttons.h"
 #include "lcd.h" 
 
-// =========================================================
-// ZADANIE 1 - PODPROGRAMY LICZNIKÓW button s3 cofasz a button s6 dajesz na kolejny program
-// =========================================================
-
-// Podprogram 1: 8-bitowy licznik binarny w górę (0...255)
+//8-bitowy licznik binarny w górę
 int prog1(void) {
-    unsigned char count = 0; // Zmienna licznika
+    unsigned char count = 0; 
     
     LCD_ClearScreen();
     LCD_PutString("P1: BIN W GORE", 14);
@@ -20,18 +16,17 @@ int prog1(void) {
     while(BUTTON_IsPressed(BUTTON_S6) || BUTTON_IsPressed(BUTTON_S3)) { __delay32(10000); }
 
     while(1) {
-        // Sprawdzanie przycisków i ewakuacja (zmiana stanu)
-        if (BUTTON_IsPressed(BUTTON_S6)) return 2; // Następny program to 2
-        if (BUTTON_IsPressed(BUTTON_S3)) return 6; // Poprzedni program to 6
+        if (BUTTON_IsPressed(BUTTON_S6)) return 2;
+        if (BUTTON_IsPressed(BUTTON_S3)) return 6;6
 
-        LATA = count; // Wystawienie wartości na diody LED
-        count++;      // Inkrementacja (po 255 nastąpi naturalne przekręcenie na 0)
+        LATA = count; 
+        count++;      
         
-        __delay32(2000000); // Opóźnienie, aby licznik był widoczny dla oka
+        __delay32(2000000);
     }
 }
 
-// Podprogram 2: 8-bitowy licznik binarny w dół (255...0)
+//8-bitowy licznik binarny w dół
 int prog2(void) {
     unsigned char count = 255; 
     
@@ -51,7 +46,7 @@ int prog2(void) {
     }
 }
 
-// Podprogram 3: 8-bitowy licznik kod Graya w górę
+//8-bitowy licznik kod Graya w górę
 int prog3(void) {
     unsigned char count = 0;
     
@@ -64,7 +59,7 @@ int prog3(void) {
         if (BUTTON_IsPressed(BUTTON_S6)) return 4;
         if (BUTTON_IsPressed(BUTTON_S3)) return 2;
 
-        // Konwersja naturalnego kodu binarnego na kod Graya: G = B XOR (B przesunięte o 1 w prawo)
+        //Konwersja kodu binarnego na kod Graya:
         unsigned char grayValue = count ^ (count >> 1);
         LATA = grayValue;
         
@@ -73,7 +68,7 @@ int prog3(void) {
     }
 }
 
-// Podprogram 4: 8-bitowy licznik kod Graya w dół
+//8-bitowy licznik kod Graya w dół
 int prog4(void) {
     unsigned char count = 255;
     
@@ -94,9 +89,8 @@ int prog4(void) {
     }
 }
 
-// Podprogram 5: 2x4 bitowy licznik w kodzie BCD w górę (0...99)
+//2x4 bitowy licznik w kodzie BCD w górę (0...99)
 int prog5(void) {
-    // Używamy typu ze znakiem (char zamiast unsigned char), by łatwo sprawdzać przekroczenia
     char tens = 0; // dziesiątki
     char units = 0; // jedności
     
@@ -109,23 +103,22 @@ int prog5(void) {
         if (BUTTON_IsPressed(BUTTON_S6)) return 6;
         if (BUTTON_IsPressed(BUTTON_S3)) return 4;
 
-        // Składanie dwóch cyfr na jednym porcie: dziesiątki przesuwamy na 4 najstarsze bity
+        //Składanie dwóch cyfr na jednym porcie
         LATA = (tens << 4) | units;
 
         units++;
-        // Kiedy jedności przekroczą 9, zerujemy je i zwiększamy dziesiątki
         if (units > 9) {
             units = 0;
             tens++;
             if (tens > 9) {
-                tens = 0; // Wyzerowanie po dojściu do 99
+                tens = 0; //wyzerowanie po dojściu do 99
             }
         }
         __delay32(2000000);
     }
 }
 
-// Podprogram 6: 2x4 bitowy licznik w kodzie BCD w dół (99...0)
+//2x4 bitowy licznik w kodzie BCD w dół (99...0)
 int prog6(void) {
     char tens = 9;
     char units = 9;
@@ -136,38 +129,35 @@ int prog6(void) {
     while(BUTTON_IsPressed(BUTTON_S6) || BUTTON_IsPressed(BUTTON_S3)) { __delay32(10000); }
 
     while(1) {
-        if (BUTTON_IsPressed(BUTTON_S6)) return 1; // Zapętlenie w górę do programu 1
+        if (BUTTON_IsPressed(BUTTON_S6)) return 1;
         if (BUTTON_IsPressed(BUTTON_S3)) return 5;
 
         LATA = (tens << 4) | units;
 
         units--;
-        // Jeśli jedności spadną poniżej 0, ustawiamy je na 9 i odejmujemy dziesiątki
         if (units < 0) {
             units = 9;
             tens--;
             if (tens < 0) {
-                tens = 9; // Reset do 99 po przejściu poniżej zera
+                tens = 9;
             }
         }
         __delay32(2000000);
     }
 }
 
-// =========================================================
-// FUNKCJA GŁÓWNA
-// =========================================================
+
 int main(void){
-    // Konfiguracja sprzętu
-    AD1PCFG = 0xFFFF; // Piny jako cyfrowe I/O
-    TRISA = 0x0000;   // Cały port A (wszystkie 8 diod LED) jako wyjścia
+    //conf
+    AD1PCFG = 0xFFFF; 
+    TRISA = 0x0000;   
     
     LCD_Initialize();
 
-    // Zaczynamy od programu nr 1
+    //start od programu nr 1
     int active_program = 1; 
 
-    // Główna pętla sterująca maszyną stanów
+    //glowna petla sterujaca przelaczaniem programow
     while(1) {
         switch(active_program) {
             case 1: active_program = prog1(); break;
@@ -176,7 +166,7 @@ int main(void){
             case 4: active_program = prog4(); break;
             case 5: active_program = prog5(); break;
             case 6: active_program = prog6(); break;
-            default: active_program = 1; break; // Zabezpieczenie
+            default: active_program = 1; break; 
         }
     }
     
