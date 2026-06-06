@@ -18,6 +18,7 @@
 //taktowanie dla delay_32
 #define FCY 4000000UL 
 
+#include "lcd.h"
 #include <xc.h>
 #include <libpic30.h>
 #include <stdbool.h>
@@ -43,6 +44,9 @@ int main(void) {
     unsigned int wartoscPotencjometru = 0;
     int licznikCzasu = 0; 
     
+    LCD_Initialize();
+    LCD_ClearScreen();
+    
 
     //glowna petla programu
     while (1) {
@@ -65,7 +69,7 @@ int main(void) {
             //proba wylaczenia dziala tylko gdy suwak<50%
             if (wartoscPotencjometru < 512 && BUTTON_IsPressed(BUTTON_S3) == true) {
                 obecnyStan = STAN_NORMALNY;
-                LATA = 0x0000; // Zgaś diody
+                LATA = 0x0000; // Zga? diody
             }
             
             //jesli nie wylaczono nadal mruga
