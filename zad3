@@ -1,3 +1,20 @@
+// PIC24FJ128GA010 Configuration Bit Settings
+// CONFIG2
+#pragma config POSCMOD = XT 
+#pragma config OSCIOFNC = ON 
+#pragma config FCKSM = CSDCMD 
+#pragma config FNOSC = PRI 
+#pragma config IESO = ON 
+// CONFIG1
+#pragma config WDTPS = PS32768 
+#pragma config FWPSA = PR128 
+#pragma config WINDIS = ON 
+#pragma config FWDTEN = OFF 
+#pragma config ICS = PGx2 
+#pragma config GWRP = OFF 
+#pragma config GCP = OFF 
+#pragma config JTAGEN = OFF
+
 #include <xc.h>
 #include <libpic30.h>
 #include <stdbool.h>
@@ -15,7 +32,7 @@ int main(void) {
     LCD_ClearScreen();
     
     //tekst do animacji
-    char scrollMsg[] = "        Nie wychodz po zmroku... Ucieczka jest niemozliwa... Obejrzyj STAMTAD NA NETFLIX!!!        ";
+    char scrollMsg[] = "        Nie wychodz po zmroku... Ucieczka jest niemozliwa... Obejrzyj STAMTAD NA HBO-MAX!!!                ";
     //obliczanie dlugosci komunikatu
     int msgLen = strlen(scrollMsg);
     
