@@ -1,0 +1,176 @@
+// PIC24FJ128GA010 Configuration Bit Settings
+// CONFIG1
+#pragma config POSCMOD = XT 
+#pragma config OSCIOFNC = ON 
+#pragma config FCKSM = CSDCMD 
+#pragma config FNOSC = PRI 
+#pragma config IESO = ON 
+#pragma config WDTPS = PS32768 
+#pragma config FWPSA = PR128 
+#pragma config WINDIS = ON 
+#pragma config FWDTEN = OFF 
+#pragma config ICS = PGx2 
+#pragma config GWRP = OFF 
+#pragma config GCP = OFF 
+#pragma config JTAGEN = OFF 
+// CONFIG2
+#include <xc.h>
+#include <libpic30.h>
+#include <stdbool.h>    
+#include <stdint.h>      
+#include <stdio.h>
+#include "buttons.h"
+#include "lcd.h" 
+#include "adc.h"
+
+//stany pracy mikrofali
+typedef enum {
+    STAN_GOTOWA,
+    STAN_GRZANIE,
+    STAN_PAUZA,
+    STAN_KONIEC
+} StanMikrofali;
+
+int main(void) {
+    AD1PCFG = 0xFFFF; 
+    TRISA = 0x0000;
+    LATA = 0x0000;
+    
+    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
+    
+    LCD_Initialize();
+    LCD_ClearScreen();
+
+    StanMikrofali stan = STAN_GOTOWA;
+    int czasSekundy = 0;       //czas grzania
+    int mocProcent = 0;        //moc w %
+    int odliczanieBazy = 0;    //licznik p?tli do uciekania sekund
+    
+    //zmienne do wykrywania wcisniecia przycisku
+    bool s3Poprzednio = false;
+    bool s4Poprzednio = false;
+    bool s6Poprzednio = false;
+    
+    //zmienne do odswiezania lcd
+    StanMikrofali staryStan = STAN_KONIEC; 
+    int staryCzas = -1;
+    int staraMoc = -1;
+    char buforLcd[33]; 
+    
+    while(1) {
+        //Odczyt mocy mikrofali (0-100%)
+        unsigned int adcVal = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
+        if(adcVal != 0xFFFF) {
+            //poprawka: '100L' zapobiega bledom integeroverflow
+            mocProcent = (adcVal * 100L) / 1023; 
+        }
+
+        bool s3Teraz = BUTTON_IsPressed(BUTTON_S3);
+        bool s4Teraz = BUTTON_IsPressed(BUTTON_S4);
+        bool s6Teraz = BUTTON_IsPressed(BUTTON_S6);
+        
+        bool wcisnietoDodajCzas = s3Teraz && !s3Poprzednio; //+10 sekund
+        bool wcisnietoStartStop = s4Teraz && !s4Poprzednio; //start/pauza
+        bool wcisnietoReset     = s6Teraz && !s6Poprzednio; //anuluj/reset
+        
+        s3Poprzednio = s3Teraz;
+        s4Poprzednio = s4Teraz;
+        s6Poprzednio = s6Teraz;
+
+
+        //przycisk S3 +10s:
+        if (wcisnietoDodajCzas) {
+            czasSekundy += 10;
+            if (czasSekundy > 3599) czasSekundy = 3599; 
+            
+            if (stan == STAN_KONIEC) {
+                stan = STAN_GOTOWA;
+                LATA = 0x0000;
+            }
+        }
+        
+        //przycisk S6 reset:
+        if (wcisnietoReset) {
+            czasSekundy = 0;
+            stan = STAN_GOTOWA;
+            LATA = 0x0000;
+        }
+
+        //przycisk S4 start/stop
+        if (wcisnietoStartStop) {
+            if (stan == STAN_GOTOWA && czasSekundy > 0) {
+                stan = STAN_GRZANIE;
+            } else if (stan == STAN_GRZANIE) {
+                stan = STAN_PAUZA;
+                LATA = 0x0000;
+            } else if (stan == STAN_PAUZA && czasSekundy > 0) {
+                stan = STAN_GRZANIE;
+            } else if (stan == STAN_KONIEC) {
+                stan = STAN_GOTOWA;
+            }
+        }
+
+        //up?yw czasu
+        if (stan == STAN_GRZANIE) {
+            odliczanieBazy++;
+            
+            //animacja diod
+            int fazaAnimacji = (odliczanieBazy / 2) % 8; // POPRAWKA: % 8 zamiast % 4 dla 8 diod
+            LATA = (1 << fazaAnimacji); 
+            
+            //co 10 obiegów odlicz 1 sekund?
+            if (odliczanieBazy >= 10) {
+                odliczanieBazy = 0;
+                czasSekundy--;
+                
+                if (czasSekundy <= 0) {
+                    czasSekundy = 0;
+                    stan = STAN_KONIEC;
+                    LATA = 0x0000;
+                }
+            }
+        } 
+        else if (stan == STAN_KONIEC) {
+            //gotowe - mruganie diodami
+            odliczanieBazy++;
+            if ((odliczanieBazy / 5) % 2 == 0) LATA = 0x00FF;
+            else LATA = 0x0000;
+        } 
+        else {
+            odliczanieBazy = 0;
+        }
+
+        //wyswietlacz lcd
+        if (stan != staryStan || czasSekundy != staryCzas || (mocProcent/2) != (staraMoc/2)) {
+            staryStan = stan;
+            staryCzas = czasSekundy;
+            staraMoc = mocProcent;
+
+            int minuty = czasSekundy / 60;
+            int sekundy = czasSekundy % 60;
+
+            char nazwaStanu[11];
+            if (stan == STAN_GOTOWA) sprintf(nazwaStanu, "GOTOWA");
+            else if (stan == STAN_GRZANIE) sprintf(nazwaStanu, "GRZANIE");
+            else if (stan == STAN_PAUZA) sprintf(nazwaStanu, "PAUZA");
+            else if (stan == STAN_KONIEC) sprintf(nazwaStanu, "KONIEC");
+
+            LCD_ClearScreen();
+            
+            char linia1[17];
+            char linia2[17];
+            
+            sprintf(linia1, "MOC:%3d%%   %02d:%02d", mocProcent, minuty, sekundy); 
+            sprintf(linia2, "STAN: %-10s", nazwaStanu);
+            
+            sprintf(buforLcd, "%-16s%-16s", linia1, linia2);
+            
+            LCD_PutString(buforLcd, 32);
+        }
+
+        __delay32(400000); 
+    }
+    
+    return 0;
+}

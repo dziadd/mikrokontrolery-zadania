@@ -1,0 +1,166 @@
+// PIC24FJ128GA010 Configuration Bit Settings
+// CONFIG1
+#pragma config POSCMOD = XT 
+#pragma config OSCIOFNC = ON 
+#pragma config FCKSM = CSDCMD 
+#pragma config FNOSC = PRI 
+#pragma config IESO = ON 
+#pragma config WDTPS = PS32768 
+#pragma config FWPSA = PR128 
+#pragma config WINDIS = ON 
+#pragma config FWDTEN = OFF 
+#pragma config ICS = PGx2 
+#pragma config GWRP = OFF 
+#pragma config GCP = OFF 
+#pragma config JTAGEN = OFF 
+// CONFIG2
+#include <xc.h>
+#include <libpic30.h>
+#include <stdbool.h>    
+#include <stdint.h>      
+#include <stdio.h>
+#include "buttons.h"
+#include "lcd.h" 
+#include "adc.h"
+
+#include <xc.h>
+#include <libpic30.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include "buttons.h"
+#include "lcd.h"
+
+//stany zegara szachowego
+typedef enum {
+    STAN_OCZEKIWANIE,
+    STAN_GRACZ1_MYSLI,
+    STAN_GRACZ2_MYSLI,
+    STAN_KONIEC_G1_PRZEGRAL,
+    STAN_KONIEC_G2_PRZEGRAL
+} StanZegara;
+
+int main(void) {
+    AD1PCFG = 0xFFFF; 
+    TRISA = 0x0080;   
+    LATA = 0x0000;
+
+    LCD_Initialize();
+    LCD_ClearScreen();
+
+    StanZegara stan = STAN_OCZEKIWANIE;
+    StanZegara staryStan = STAN_OCZEKIWANIE; 
+
+    long czasG1 = 100;
+    long czasG2 = 3000;
+
+    long staryCzasG1 = -1;
+    long staryCzasG2 = -1;
+
+    bool s3Poprzednio = false;
+    bool s6Poprzednio = false;
+    bool s4Poprzednio = false;
+
+    char buforLcd[33];
+
+    while(1) {
+        //odczyt przyciskow graczy
+        bool s3Teraz = BUTTON_IsPressed(BUTTON_S3); // Gracz 1
+        bool s6Teraz = BUTTON_IsPressed(BUTTON_S6); // Gracz 2
+        bool s4Teraz = BUTTON_IsPressed(BUTTON_S4); // Reset
+
+        bool wcisnietoG1 = s3Teraz && !s3Poprzednio;
+        bool wcisnietoG2 = s6Teraz && !s6Poprzednio;
+        bool wcisnietoReset = s4Teraz && !s4Poprzednio;
+
+        s3Poprzednio = s3Teraz;
+        s6Poprzednio = s6Teraz;
+        s4Poprzednio = s4Teraz;
+
+        //logika stanow zegara
+        if (wcisnietoReset) {
+            stan = STAN_OCZEKIWANIE;
+            czasG1 = 3000;
+            czasG2 = 3000;
+            LCD_ClearScreen();
+        }
+
+        if (stan == STAN_OCZEKIWANIE) {
+            //pierwsze wcisniecie startuje zegar przeciwnika
+            if (wcisnietoG1) stan = STAN_GRACZ2_MYSLI;
+            else if (wcisnietoG2) stan = STAN_GRACZ1_MYSLI;
+        } 
+        else if (stan == STAN_GRACZ1_MYSLI) {
+            if (wcisnietoG1) {
+                stan = STAN_GRACZ2_MYSLI; 
+            } else {
+                czasG1--; 
+                if (czasG1 <= 0) {
+                    czasG1 = 0;
+                    stan = STAN_KONIEC_G1_PRZEGRAL;
+                    LCD_ClearScreen();
+                }
+            }
+        } 
+        else if (stan == STAN_GRACZ2_MYSLI) {
+            if (wcisnietoG2) {
+                stan = STAN_GRACZ1_MYSLI; 
+            } else {
+                czasG2--; // Zegar gracza 2 tyka (co 100ms)
+                if (czasG2 <= 0) {
+                    czasG2 = 0;
+                    stan = STAN_KONIEC_G2_PRZEGRAL;
+                    LCD_ClearScreen();
+                }
+            }
+        }
+
+        //wyswietlacz lcd
+        if (stan != staryStan || (czasG1/10) != (staryCzasG1/10) || (czasG2/10) != (staryCzasG2/10)) {
+            staryStan = stan;
+            staryCzasG1 = czasG1;
+            staryCzasG2 = czasG2;
+
+            if (stan == STAN_KONIEC_G1_PRZEGRAL) {
+                sprintf(buforLcd, "%-16s%-16s", "CZAS MINAL!", "GRACZ 1 PRZEGRAL");
+                LCD_PutString(buforLcd, 32);
+            } 
+            else if (stan == STAN_KONIEC_G2_PRZEGRAL) {
+                sprintf(buforLcd, "%-16s%-16s", "CZAS MINAL!", "GRACZ 2 PRZEGRAL");
+                LCD_PutString(buforLcd, 32);
+            } 
+            else {
+                //przeliczanie dziesiatych czesci sekundy na format MM:SS
+                int sekundyG1 = czasG1 / 10;
+                int minG1 = sekundyG1 / 60;
+                int secG1 = sekundyG1 % 60;
+
+                int sekundyG2 = czasG2 / 10;
+                int minG2 = sekundyG2 / 60;
+                int secG2 = sekundyG2 % 60;
+
+                //strzalka ktora pokazuje na gracza ktory mysli
+                char* aktywnyG1 = (stan == STAN_GRACZ1_MYSLI) ? "< MYSLI" : "       ";
+                char* aktywnyG2 = (stan == STAN_GRACZ2_MYSLI) ? "< MYSLI" : "       ";
+                if (stan == STAN_OCZEKIWANIE) {
+                    aktywnyG1 = " GOTOWY";
+                    aktywnyG2 = " GOTOWY";
+                }
+
+                char linia1[17];
+                char linia2[17];
+                
+                sprintf(linia1, "G1: %02d:%02d%7s", minG1, secG1, aktywnyG1);
+                sprintf(linia2, "G2: %02d:%02d%7s", minG2, secG2, aktywnyG2);
+
+                sprintf(buforLcd, "%-16s%-16s", linia1, linia2);
+                
+                LCD_ClearScreen();
+                LCD_PutString(buforLcd, 32);
+            }
+        }
+
+        __delay32(400000); 
+    }
+    return 0;
+}
